@@ -1,0 +1,331 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Analysis | Payoff Calculator</title>
+<style>
+:root {
+  --navy:#172b4d; --blue:#2563eb; --light:#eff6ff;
+  --green:#15803d; --red:#b91c1c; --gold:#b7791f;
+  --bg:#f4f7fb; --border:#dbe3ef; --text:#253247;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+ font-family:Inter,Arial,sans-serif;line-height:1.5}
+header{background:linear-gradient(120deg,#172b4d,#2856a3);
+ color:white;padding:30px max(5%,calc((100% - 1200px)/2))}
+header h1{margin:0 0 5px;font-size:27px}
+header p{margin:0;color:#dbeafe}
+main{max-width:1200px;margin:24px auto;padding:0 18px}
+section,.panel{background:white;border:1px solid var(--border);
+ border-radius:12px;padding:20px;margin-bottom:20px}
+h2{font-size:19px;color:var(--navy);margin:0 0 14px}
+h3{font-size:15px;color:var(--navy)}
+button,select,input{font:inherit}
+button{border:0;border-radius:7px;padding:9px 14px;
+ background:var(--blue);color:white;cursor:pointer;margin:3px}
+button.secondary{background:#e8eef8;color:var(--navy)}
+button.danger{background:#fee2e2;color:var(--red)}
+button:hover{filter:brightness(.94)}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}
+input,select{border:1px solid #cbd5e1;border-radius:6px;
+ padding:7px;min-width:65px;max-width:100%;background:white}
+input[type=number]{width:90px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid var(--border);padding:9px;text-align:center}
+th{background:#edf3fc;color:var(--navy)}
+td input{width:100%;min-width:55px}
+.table-wrap{overflow-x:auto}
+.note{font-size:13px;color:#64748b}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.metric{border:1px solid var(--border);padding:14px;border-radius:9px}
+.metric strong{display:block;color:var(--navy);font-size:13px}
+.metric .value{font-size:21px;font-weight:750;margin-top:6px}
+.winner{background:#ecfdf3;border-color:#86d5a2}
+.result-table td:first-child{text-align:left;font-weight:600}
+.tag{display:inline-block;border-radius:20px;padding:3px 9px;
+ font-size:11px;background:#e8eef8;color:#29436b}
+.tag.good{background:#dcfce7;color:#166534}
+.tag.bad{background:#fee2e2;color:#991b1b}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px}
+.stage{flex:1;min-width:175px;border:1px solid var(--border);
+ border-radius:9px;padding:12px;background:#f8fafc}
+.stage h3{margin:0 0 8px}
+.arrow{align-self:center;color:#64748b;font-size:23px}
+.alive{color:var(--green);font-weight:700}
+.dead{color:var(--red);text-decoration:line-through}
+footer{text-align:center;padding:25px;color:#64748b;font-size:13px}
+footer a{color:var(--blue)}
+@media(max-width:600px){
+ header h1{font-size:22px}
+ section{padding:13px}
+ .arrow{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>Decision Analysis & Payoff Calculator</h1>
+<p>Evaluate alternatives under uncertainty and risk using quantitative decision criteria.</p>
+</header>
+<main>
+<section>
+<h2>1. Load an example or create a problem</h2>
+<div class="toolbar">
+<button onclick="loadExample(0)">Example 1: Investment decision</button>
+<button onclick="loadExample(1)">Example 2: Production decision</button>
+<button class="secondary" onclick="resetProblem()">New problem</button>
+</div>
+<label>Problem title: <input id="problemTitle" style="width:65%" value="Investment decision"></label>
+<p class="note">All payoff values should use the same monetary or utility unit. Positive and negative payoffs are supported.</p>
+</section>
+
+<section>
+<h2>2. Define the states of nature</h2>
+<p class="note">Enter each possible future scenario and its probability. Probabilities are automatically normalized for EMV calculations if their sum is not 1.</p>
+<div class="toolbar">
+<button onclick="addState()">+ Add state</button>
+</div>
+<div class="table-wrap">
+<table id="statesTable"></table>
+</div>
+<div id="probInfo" class="note"></div>
+</section>
+
+<section>
+<h2>3. Define decision alternatives and payoffs</h2>
+<p class="note">Enter the payoff associated with each alternative under every state of nature.</p>
+<div class="toolbar">
+<button onclick="addAlternative()">+ Add alternative</button>
+</div>
+<div class="table-wrap">
+<table id="payoffTable"></table>
+</div>
+</section>
+
+<section>
+<h2>4. Decision criteria results</h2>
+<div class="grid" id="metrics"></div>
+<div style="margin-top:18px">
+<h3>Detailed comparison</h3>
+<div class="table-wrap"><table id="resultsTable" class="result-table"></table></div>
+</div>
+<div style="margin-top:18px">
+<h3>Regret matrix</h3>
+<div class="table-wrap"><table id="regretTable"></table></div>
+</div>
+</section>
+
+<section>
+<h2>5. Sequential filtering</h2>
+<p class="note">The filtering process applies the criteria in the requested order. At each stage, all tied best alternatives survive. Regret values are calculated against the original complete decision set.</p>
+<div id="filterSummary"></div>
+<div class="flow" id="flow"></div>
+</section>
+
+<section>
+<h2>6. Interpretation and recommendations</h2>
+<div id="interpretation"></div>
+</section>
+
+<section>
+<h2>7. Data management</h2>
+<div class="toolbar">
+<button onclick="exportCSV()">Download results (CSV)</button>
+<button class="secondary" onclick="window.print()">Print report / Save PDF</button>
+</div>
+<p class="note">Your calculations run locally in this browser. Download a CSV to retain your results.</p>
+</section>
+</main>
+
+<footer>
+<p>Decision Analysis Educational Tool</p>
+<p>Development conversation:
+<a id="conversationLink" href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT conversation</a></p>
+<p class="note">Replace the conversation link with the share URL of this specific development conversation.</p>
+</footer>
+
+<script>
+let states=[], alternatives=[], payoffs=[];
+const examples=[
+{
+ title:"Investment decision",
+ states:[
+  {name:"High demand",p:.30},
+  {name:"Medium demand",p:.50},
+  {name:"Low demand",p:.20}
+ ],
+ alternatives:[
+  {name:"Large investment",v:[120,50,-60]},
+  {name:"Small investment",v:[70,45,10]},
+  {name:"Maintain current operation",v:[25,25,25]}
+ ]
+},
+{
+ title:"Production decision",
+ states:[
+  {name:"High demand",p:.25},
+  {name:"Normal demand",p:.50},
+  {name:"Low demand",p:.25}
+ ],
+ alternatives:[
+  {name:"Large production",v:[150,40,-100]},
+  {name:"Medium production",v:[100,65,10]},
+  {name:"Small production",v:[55,45,30]},
+  {name:"Outsource",v:[35,35,35]}
+ ]
+}
+];
+
+function loadExample(i){
+ const e=examples[i];
+ states=e.states.map(x=>({...x}));
+ alternatives=e.alternatives.map(x=>({name:x.name}));
+ payoffs=e.alternatives.map(x=>[...x.v]);
+ document.getElementById("problemTitle").value=e.title;
+ render();
+}
+function resetProblem(){
+ states=[{name:"State 1",p:.5},{name:"State 2",p:.5}];
+ alternatives=[{name:"Alternative A"},{name:"Alternative B"}];
+ payoffs=[[0,0],[0,0]];
+ document.getElementById("problemTitle").value="New decision problem";
+ render();
+}
+function addState(){
+ states.push({name:"State "+(states.length+1),p:0});
+ payoffs.forEach(r=>r.push(0)); render();
+}
+function addAlternative(){
+ alternatives.push({name:"Alternative "+(alternatives.length+1)});
+ payoffs.push(states.map(()=>0)); render();
+}
+function removeState(i){
+ if(states.length<=1)return alert("At least one state is required.");
+ states.splice(i,1);payoffs.forEach(r=>r.splice(i,1));render();
+}
+function removeAlternative(i){
+ if(alternatives.length<=1)return alert("At least one alternative is required.");
+ alternatives.splice(i,1);payoffs.splice(i,1);render();
+}
+function setState(i,k,v){
+ states[i][k]=k==="p"?Number(v):v;calculate();
+}
+function setAlt(i,v){alternatives[i].name=v;calculate();}
+function setPayoff(i,j,v){payoffs[i][j]=Number(v);calculate();}
+function fmt(n){return Number.isFinite(n)?n.toFixed(2):"—";}
+function esc(s){
+ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function render(){
+ let st=`<tr><th>State</th><th>Probability</th><th>Action</th></tr>`;
+ states.forEach((s,i)=>{
+ st+=`<tr><td><input value="${esc(s.name)}" onchange="setState(${i},'name',this.value)"></td>
+ <td><input type="number" min="0" step=".01" value="${s.p}" onchange="setState(${i},'p',this.value)"></td>
+ <td><button class="danger" onclick="removeState(${i})">Remove</button></td></tr>`;
+ });
+ document.getElementById("statesTable").innerHTML=st;
+ let t="<tr><th>Alternative</th>"+states.map(s=>`<th>${esc(s.name)}</th>`).join("")+"<th>Action</th></tr>";
+ alternatives.forEach((a,i)=>{
+ t+=`<tr><td><input value="${esc(a.name)}" onchange="setAlt(${i},this.value)"></td>`;
+ states.forEach((s,j)=>t+=`<td><input type="number" step="any" value="${payoffs[i][j]}" onchange="setPayoff(${i},${j},this.value)"></td>`);
+ t+=`<td><button class="danger" onclick="removeAlternative(${i})">Remove</button></td></tr>`;
+ });
+ document.getElementById("payoffTable").innerHTML=t;
+ calculate();
+}
+
+function calculate(){
+ if(!states.length||!alternatives.length)return;
+ const n=alternatives.length,m=states.length;
+ const sum=states.reduce((a,s)=>a+s.p,0);
+ const probs=sum>0?states.map(s=>s.p/sum):states.map(()=>1/m);
+ document.getElementById("probInfo").textContent=
+ `Probability total: ${fmt(sum)} | ${sum>0?"Normalized probabilities are used for EMV.":"All states receive equal probability because the total is zero."}`;
+ const maxima=states.map((s,j)=>Math.max(...payoffs.map(r=>r[j])));
+ const regrets=payoffs.map(r=>r.map((v,j)=>maxima[j]-v));
+ const maxPay=payoffs.map(r=>Math.max(...r));
+ const minPay=payoffs.map(r=>Math.min(...r));
+ const maxRegret=regrets.map(r=>Math.max(...r));
+ const emv=payoffs.map(r=>r.reduce((a,v,j)=>a+v*probs[j],0));
+ const best=(arr,mode)=>mode==="max"?Math.max(...arr):Math.min(...arr);
+ const winners=(arr,mode)=>arr.map((v,i)=>Math.abs(v-best(arr,mode))<1e-8?i:-1).filter(i=>i>=0);
+ const mx=winners(maxPay,"max"),mn=winners(minPay,"max");
+ const mr=winners(maxRegret,"min"),ev=winners(emv,"max");
+ const fmtNames=ids=>ids.map(i=>alternatives[i].name).join(", ");
+ const metricData=[
+ ["Maximax",Math.max(...maxPay),fmtNames(mx),"Highest possible payoff"],
+ ["Maximin",Math.max(...minPay),fmtNames(mn),"Highest minimum payoff"],
+ ["Minimax regret",Math.min(...maxRegret),fmtNames(mr),"Lowest maximum regret"],
+ ["EMV / Bayes",Math.max(...emv),fmtNames(ev),"Highest expected monetary value"]
+ ];
+ document.getElementById("metrics").innerHTML=metricData.map(x=>
+ `<div class="metric"><strong>${x[0]}</strong><div class="value">${fmt(x[1])}</div><div class="tag good">${esc(x[2])}</div><p class="note">${x[3]}</p></div>`
+ ).join("");
+ let rt="<tr><th>Alternative</th><th>Maximax</th><th>Maximin</th><th>Maximum regret</th><th>EMV</th></tr>";
+ alternatives.forEach((a,i)=>{
+ rt+=`<tr><td>${esc(a.name)}</td><td>${fmt(maxPay[i])}</td><td>${fmt(minPay[i])}</td><td>${fmt(maxRegret[i])}</td><td>${fmt(emv[i])}</td></tr>`;
+ });
+ document.getElementById("resultsTable").innerHTML=rt;
+ let gt="<tr><th>Alternative</th>"+states.map(s=>`<th>${esc(s.name)}</th>`).join("")+"<th>Maximum regret</th></tr>";
+ alternatives.forEach((a,i)=>{
+ gt+=`<tr><td>${esc(a.name)}</td>`+regrets[i].map(v=>`<td>${fmt(v)}</td>`).join("")+`<td>${fmt(maxRegret[i])}</td></tr>`;
+ });
+ document.getElementById("regretTable").innerHTML=gt;
+
+ // Sequential filtering: EMV first, then minimax regret, then maximin.
+ const stages=[
+  {name:"Stage 1: EMV",values:emv,mode:"max",reason:"Highest expected monetary value"},
+  {name:"Stage 2: Minimax regret",values:maxRegret,mode:"min",reason:"Lowest maximum regret"},
+  {name:"Stage 3: Maximin",values:minPay,mode:"max",reason:"Highest minimum payoff"}
+ ];
+ let survivors=alternatives.map((a,i)=>i);
+ let html="";
+ stages.forEach((stage,k)=>{
+  const vals=survivors.map(i=>stage.values[i]);
+  const target=best(vals,stage.mode);
+  const keep=survivors.filter(i=>Math.abs(stage.values[i]-target)<1e-8);
+  const eliminated=survivors.filter(i=>!keep.includes(i));
+  html+=`<div class="stage"><h3>${stage.name}</h3><p class="note">${stage.reason}</p>
+  <p><b>Criterion value:</b> ${fmt(target)}</p>
+  <p class="alive">Survive (${keep.length})</p>
+  ${keep.map(i=>`<div class="alive">✓ ${esc(alternatives[i].name)}</div>`).join("")}
+  ${eliminated.length?`<p class="dead">Eliminated (${eliminated.length})</p>`:
+  `<p class="note">No alternatives eliminated</p>`}
+  ${eliminated.map(i=>`<div class="dead">✕ ${esc(alternatives[i].name)} (${fmt(stage.values[i])})</div>`).join("")}
+  </div>`;
+  if(k<2)html+=`<div class="arrow">→</div>`;
+  survivors=keep;
+ });
+ document.getElementById("flow").innerHTML=html;
+ document.getElementById("filterSummary").innerHTML=
+ `<p><b>Initial alternatives:</b> ${n} &nbsp; | &nbsp; <b>Final survivors:</b> ${survivors.length}</p>`;
+ document.getElementById("interpretation").innerHTML=`
+ <p><b>Maximax:</b> ${esc(fmtNames(mx))} is recommended for an optimistic decision-maker.</p>
+ <p><b>Maximin:</b> ${esc(fmtNames(mn))} is recommended for a pessimistic or conservative decision-maker.</p>
+ <p><b>Minimax regret:</b> ${esc(fmtNames(mr))} minimizes the worst possible opportunity loss.</p>
+ <p><b>EMV:</b> ${esc(fmtNames(ev))} offers the highest expected monetary value, assuming the supplied probabilities are appropriate.</p>
+ <p><b>Sequential filtering:</b> ${survivors.length?esc(fmtNames(survivors)):"No surviving alternative"}.
+ ${survivors.length===1?"One alternative remains after all three stages.": "The final stage retains all tied alternatives; the criteria do not necessarily produce a unique winner."}</p>`;
+ window.currentResults={maxPay,minPay,maxRegret,emv,regrets,probs};
+}
+
+function exportCSV(){
+ const r=window.currentResults;if(!r)return;
+ let rows=[["Alternative",...states.map(s=>s.name),"Maximax","Maximin","Max regret","EMV"]];
+ alternatives.forEach((a,i)=>rows.push([
+ a.name,...payoffs[i],r.maxPay[i],r.minPay[i],r.maxRegret[i],r.emv[i]
+ ]));
+ rows.push(["Probability",...r.probs]);
+ const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download="decision-analysis-results.csv";a.click();
+ URL.revokeObjectURL(url);
+}
+loadExample(0);
+</script>
+</body>
+</html>
